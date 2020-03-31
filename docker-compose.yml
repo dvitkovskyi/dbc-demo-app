@@ -1,0 +1,29 @@
+version: "3"
+services:
+  mongo:
+    image: mongo
+    ports:
+      - "27017:27017"
+  backend:
+    build:
+      context: ./back-end
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3002"
+    depends_on:
+      - mongo
+    environment:
+      MONGO_URI: mogodb://mongo:27017/todos
+      APP_PORT: 3002
+  frontend:
+    build:
+      context: ./front-end
+      dockerfile: Dockerfile
+    ports:
+      - "3003:3003"
+    depends_on:
+      - backend
+    environment:
+      VUE_APP_BACKEND_URL: http://backend:3002/todos
+networks:
+  default:
