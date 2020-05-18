@@ -14,7 +14,10 @@ docker swarm init --advertise-addr 192.168.1.110
 #join workers
 docker swarm join --token SWMTKN-1-292hrh8xdu8z8y5ti19c3repqt8yvi9n8kf6fmrzsyya95v6ir-5mgrehm0727s730ufbodj38he 192.168.1.110:2377
 #github manipulations
-
+mkdir /demo
+cd /tmp
+git clone https://github.com/gfedorenko-mk/dbc-demo-app.git
+mv /tmp/dbc-demo-app/* /demo/
 
 #create local registry
 docker service create --name registry --publish published=5000,target=5000 registry:2
