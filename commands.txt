@@ -1,0 +1,39 @@
+install docker-ce
+#init docker swarm cluster
+docker swarm init --advertise-addr 192.168.1.110
+#configure firewall(centos)
+  firewall-cmd --permanent --add-port=2376/tcp
+  firewall-cmd --permanent --add-port=2377/tcp
+  firewall-cmd --permanent --add-port=7946/tcp
+  firewall-cmd --permanent --add-port=80/tcp
+  firewall-cmd --permanent --add-port=7946/udp
+  firewall-cmd --permanent --add-port=4789/udp
+  firewall-cmd --permanent --add-port=5000/udp
+  firewall-cmd --permanent --add-port=5000/udp
+  firewall-cmd --reload
+#join workers
+docker swarm join --token SWMTKN-1-292hrh8xdu8z8y5ti19c3repqt8yvi9n8kf6fmrzsyya95v6ir-5mgrehm0727s730ufbodj38he 192.168.1.110:2377
+#github manipulations
+
+
+#create local registry
+docker service create --name registry --publish published=5000,target=5000 registry:2
+#check registry
+docker service ls
+curl http://localhost:5000/v2/
+#1st build and check images
+docker-compose up -d
+docker images
+docker-compose ps
+docker-compose down --volumes
+#push images to cluster
+docker-compose push
+#deploy stack
+docker stack deploy --compose-file=docker-compose.yml homework
+#scale services
+docker service scale homework_mongo=3
+docker service scale homework_backend=3
+docker service scale homework_frontend=3
+#check services
+docker service ls
+
