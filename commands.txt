@@ -40,4 +40,29 @@ docker service scale homework_frontend=3
 #check services
 docker service ls
 
+-------------------------------------------
+#install ansible
+yum -y install ansible
+#key exchange
+ssh-keygen
+cat /root/.ssh/id_rsa.pub
+cd /root/.ssh/
+touch authorized_keys
+chmod 644 authorized_keys
+copy key into authorized_keys
+repeat on all servers
+#ansible setup
+/etc/ansible/ansible.cfg
+### Отменяем запрос добавления ключа ###
+host_key_checking = false
+### убирает варнинг по версии питона ###
+deprecation_warnings=False
+#ansible hosts
+[servers]
+master ansible_host=192.168.1.110 ansible_user=root ansible_ssh_private_key_file=/root/.ssh/id_rsa
+node1  ansible_host=192.168.1.111 ansible_user=root ansible_ssh_private_key_file=/root/.ssh/id_rsa
+node2  ansible_host=192.168.1.112 ansible_user=root ansible_ssh_private_key_file=/root/.ssh/id_rsa
+#check hosts 
+ansible -m ping servers
+
 
