@@ -6,6 +6,7 @@ services:
                - "27017:27017"
 
         backend:
+            image: 127.0.0.1:5000/backend
             build:
                context: ./back-end
                dockerfile: Dockerfile
@@ -17,6 +18,7 @@ services:
                MONGO_URI: mogodb://mongo:27017/todos
 
         frontend:
+           image: 127.0.0.1:5000/frontend
            build:
               context: ./front-end
               dockerfile: Dockerfile
