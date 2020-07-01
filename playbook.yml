@@ -1,0 +1,164 @@
+---
+  - name: Sw cluster
+    hosts: servers
+    become: yes
+
+    tasks:
+      #Firewall Ubuntu TCP
+        - name: Allow port 2376-2377
+          ufw:
+           rule: allow
+           port: 2376:2377
+           proto: tcp
+
+        - name: Allow port 7946
+          ufw:
+             rule: allow
+             port: '7946'
+             proto: tcp
+
+        - name: Allow port 80
+          ufw:
+             rule: allow
+             port: '80'
+             proto: tcp
+
+        - name: Allow port 5000
+          ufw:
+             rule: allow
+             port: '5000'
+             proto: tcp
+
+      ##Firewall Ubuntu UDP
+
+        - name: Allow port 7946
+          ufw:
+             rule: allow
+             port: '7946'
+             proto: udp
+
+        - name: Allow port 4789
+          ufw:
+             rule: allow
+             port: '4789'
+             proto: udp
+
+        - name: Allow port 5000
+          ufw:
+             rule: allow
+             port: '5000'
+             proto: udp
+
+      #Update packages Ubuntu
+        - name: update packages on Ubuntu
+          apt:
+            update_cache: yes
+            cache_valid_time: 3600
+            upgrade: dist
+          notify: Reboot Server
+
+
+      #Install prerequisites for Docker
+        - name: Install prerequisites for Docker
+          apt:
+             name: ['apt-transport-https', 'ca-certificates', 'curl', 'gnupg2', 'software-properties-common', 'git']
+             update_cache: yes
+
+        - name: Add Docker GPG key
+          apt_key: url=https://download.docker.com/linux/ubuntu/gpg
+
+        - name: Add Docker APT repository
+          apt_repository:
+             repo: deb [arch=amd64] https://download.docker.com/linux/{{ansible_distribution|lower}} {{ansible_distribution_release}} stable
+
+        - name: Update apt-get repo and cache
+          apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+
+        - name: Install Docker CE
+          apt:
+              name: ['docker-ce', 'docker-ce-cli', 'containerd.io']
+              update_cache: yes
+
+        - name: Install prerequisites for docker-compose
+          apt:
+             name: ['python-pip', 'python-setuptools', 'virtualenv']
+
+        - name: Install docker-compose
+          pip:
+             name: docker-compose
+
+        - name: Install the jsondiff on Ubuntu
+          pip:
+            name: jsondiff
+            state: latest
+
+
+      #Start Docker Service
+        - name: Start Docker Service
+          service:
+             name: docker
+             state: started
+             enabled: yes
+      #Swarm cluster
+        - name: Init a new swarm with default parameters
+          docker_swarm:
+            advertise_addr: '{{ ansible_default_ipv4.address }}'
+            state: present
+          register: result
+          when: ' ansible_default_ipv4.address == hostvars.master.ansible_default_ipv4.address '
+
+        - name: Add nodes
+          docker_swarm:
+            state: join
+            advertise_addr: '{{ hostvars.master.ansible_default_ipv4.address }}'
+            join_token: '{{ hostvars.master.result.swarm_facts.JoinTokens.Worker }}'
+            remote_addrs: '{{ hostvars.master.ansible_default_ipv4.address }}:2377'
+          when: ' ansible_default_ipv4.address != hostvars.master.ansible_default_ipv4.address '
+      # clone GIT
+        - git:
+           repo: 'https://github.com/dvitkovskyi/dbc-demo-app.git'
+           dest: /git_project
+           clone: yes
+          when: ' ansible_default_ipv4.address == hostvars.master.ansible_default_ipv4.address '
+
+      #Create Local Repository
+        - name: Setting up a docker registry
+          docker_swarm_service:
+                 name: registry
+                 image: registry:2
+                 publish: [target_port=5000 published_port=5000]
+                 replicas: 1
+                 state: present
+          when: ' ansible_default_ipv4.address == hostvars.master.ansible_default_ipv4.address '
+
+      #Build and Upload Images
+        - name: Run `docker-compose up`
+          docker_compose:
+              project_src: /git_project/
+              state: present
+          when: ' ansible_default_ipv4.address == hostvars.master.ansible_default_ipv4.address '
+
+        - name: Run `docker-compose down`
+          docker_compose:
+              project_src: /git_project/
+              state: absent
+          when: ' ansible_default_ipv4.address == hostvars.master.ansible_default_ipv4.address '
+
+      # Push to Local Registry
+        - name: Push images to local repository
+          shell: cd /git_project && docker-compose push
+          when: ' ansible_default_ipv4.address == hostvars.master.ansible_default_ipv4.address '
+
+      # Deploy stack
+        - name: Deploy stack
+          docker_stack:
+              state: present
+              name: homework
+              compose:
+                  - /git_project/docker-compose.yml
+          when: ' ansible_default_ipv4.address == hostvars.master.ansible_default_ipv4.address '
+
+    handlers:
+        - name: Reboot Server
+          reboot:
+            reboot_timeout: 3600
